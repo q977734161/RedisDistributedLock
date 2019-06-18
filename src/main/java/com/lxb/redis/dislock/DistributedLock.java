@@ -18,10 +18,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.redisson.Redisson;
+import org.redisson.RedissonFairLock;
 import org.redisson.api.RLock;
+import org.redisson.api.RReadWriteLock;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
 import org.redisson.config.SentinelServersConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * @author lixiaobao
@@ -29,6 +33,8 @@ import org.redisson.config.SentinelServersConfig;
  **/
 
 public class DistributedLock {
+
+  private static Logger LOG = LoggerFactory.getLogger(DistributedLock.class);
 
   private static DistributedLock instance = null;
 
@@ -44,6 +50,7 @@ public class DistributedLock {
       pro = getProperties();
     } catch (IOException e) {
       e.printStackTrace();
+      LOG.error(e.getMessage());
     }
     String redisModelString = pro.getProperty(Constant.REDIS_MODEL);
     RedisModel redisModel = RedisModel.getModel(redisModelString);
@@ -52,6 +59,7 @@ public class DistributedLock {
       ValidateUtil.validate(pro,redisModel);
     } catch (DistributedLockException e) {
       e.printStackTrace();
+      LOG.error(e.getMessage());
     }
     switch (redisModel) {
       case MASTER_SLAVES:
@@ -88,8 +96,14 @@ public class DistributedLock {
     ClassLoader cl = DistributedLock.class.getClassLoader();
     InputStream in = cl.getResourceAsStream(defaultConfigFile);
     Properties properties = new Properties();
-    properties.load(in);
+    if(in != null) {
+      LOG.info("use default config file");
+      properties.load(in);
+    } else {
+      LOG.warn("config.properties is not found in classpath.");
+    }
     if(null != configFile && Files.exists(Paths.get(configFile)) && !configFile.equals("")){
+      LOG.info("use config file : " + configFile + " overwrite default configuration");
       InputStream inputStream = new FileInputStream(configFile);
       properties.load(inputStream);
     }
@@ -113,6 +127,18 @@ public class DistributedLock {
 
   public RLock getLock(String name){
       return redissonClient.getLock(name);
+  }
+
+  public RLock getFairLock(String name){
+    return redissonClient.getFairLock(name);
+  }
+
+  public RLock getRedLock(String name){
+    return redissonClient.getRedLock();
+  }
+
+  public RReadWriteLock getRWLock(String name){
+    return redissonClient.getReadWriteLock(name);
   }
 
   public static void main(String[] args) {
